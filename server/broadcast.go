@@ -464,7 +464,7 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 		}
 
 		if verifier != nil {
-			err := verify(verifier, cxn, sess, seg, res, segURLs)
+			err := verify(verifier, cxn, sess, seg, res.TranscodeData, segURLs)
 			if err != nil {
 				return err
 			}
