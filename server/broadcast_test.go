@@ -504,7 +504,7 @@ func TestTranscodeSegment_VerifyPixels(t *testing.T) {
 		sessManager: bsm,
 	}
 
-	err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy")}, "dummy")
+	err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy")}, "dummy", nil)
 	assert.Nil(err)
 
 	// Wait for async pixels verification to finish (or in this case we are just making sure that it did NOT run)
@@ -519,7 +519,7 @@ func TestTranscodeSegment_VerifyPixels(t *testing.T) {
 	bsm = bsmWithSessList([]*BroadcastSession{sess})
 	cxn.sessManager = bsm
 
-	err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy")}, "dummy")
+	err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy")}, "dummy", nil)
 	assert.Nil(err)
 
 	// Wait for async pixels verification to finish
@@ -542,7 +542,7 @@ func TestTranscodeSegment_VerifyPixels(t *testing.T) {
 	bsm = bsmWithSessList([]*BroadcastSession{sess})
 	cxn.sessManager = bsm
 
-	err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy")}, "dummy")
+	err = transcodeSegment(cxn, &stream.HLSSegment{Data: []byte("dummy")}, "dummy", nil)
 	assert.Nil(err)
 
 	// Wait for async pixels verification to finish
