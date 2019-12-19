@@ -171,4 +171,15 @@ run_lp -broadcaster
 curl -sI http://127.0.0.1:7935/debug/pprof/allocs | grep "200 OK"
 kill $pid
 
+# Check that verifier shared path is required
+$TMPDIR/livepeer -broadcaster -verifierAddr addr 2>&1 | grep "Requires a path to the"
+
+# Check OK with verifier shared path
+run_lp -broadcaster -verifierAddr addr -verifierPath path
+kill $pid
+
+# Check OK with verifier + external storage
+run_lp -broadcaster -verifierAddr addr -s3bucket foo/bar -s3creds baz/bat
+kill $pid
+
 rm -rf $TMPDIR
