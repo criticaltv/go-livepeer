@@ -19,6 +19,7 @@ type Retryable struct {
 }
 
 var ErrPixelMismatch = Retryable{errors.New("PixelMismatch")}
+var ErrPixelsAbsent = errors.New("PixelsAbsent")
 
 type Params struct {
 	// ManifestID should go away once we do direct push of video
@@ -107,14 +108,16 @@ func (sv *SegmentVerifier) Verify(params *Params) (*Params, error) {
 	res, err := sv.policy.Verifier.Verify(params)
 
 	// Check pixel counts
-	if res != nil && err == nil {
+	if err == nil && res != nil && params.Results != nil {
 		if len(res.Pixels) != len(params.Results.Segments) {
 			// TODO make allowances for the verification algos not doing
 			//      pixel counts themselves; adapt broadcast.go verifyPixels
-			return params, nil
+			err = ErrPixelsAbsent
 		}
-		for i, v := range res.Pixels {
-			if v != params.Results.Segments[i].Pixels {
+		for i := 0; err == nil && i < len(params.Results.Segments) && i < len(res.Pixels); i++ {
+			reportedPixels := params.Results.Segments[i].Pixels
+			verifiedPixels := res.Pixels[i]
+			if reportedPixels != verifiedPixels {
 				err = ErrPixelMismatch
 			}
 		}
