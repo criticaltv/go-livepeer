@@ -51,7 +51,7 @@ func TestVerify(t *testing.T) {
 
 	// Check pixel list from verifier isn't what's expected
 	data := &net.TranscodeData{Segments: []*net.TranscodedSegmentData{
-		&net.TranscodedSegmentData{Url: "abc", Pixels: verifier.results.Pixels[0] + 1},
+		{Url: "abc", Pixels: verifier.results.Pixels[0] + 1},
 	}}
 	res, err = sv.Verify(&Params{Results: data})
 	assert.Nil(res)
