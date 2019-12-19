@@ -99,8 +99,8 @@ func (sv *SegmentVerifier) Verify(params *Params) (*Params, error) {
 	if sv.policy.Verifier == nil {
 		return nil, nil
 	}
-	// TODO Use policy sampling rate to determine whether to invoke verifier
-	//      If not, exit early
+	// TODO Use policy sampling rate to determine whether to invoke verifier.
+	//      If not, exit early. Seed sample using source data for repeatability!
 	res, err := sv.policy.Verifier.Verify(params)
 	if err != nil {
 		// Verification passed successfully, so use this set of params
@@ -117,12 +117,12 @@ func (sv *SegmentVerifier) Verify(params *Params) (*Params, error) {
 
 	// Check for max retries
 	// If max hit, return best params so far
-	if sv.count >= sv.policy.Retries {
+	if sv.count > sv.policy.Retries {
 		if len(sv.results) <= 0 {
-			return nil, nil
+			return nil, err
 		}
 		sort.Sort(byResScore(sv.results))
-		return sv.results[0].params, err
+		return sv.results[len(sv.results)-1].params, err
 	}
 
 	return nil, err
