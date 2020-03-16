@@ -1,8 +1,10 @@
 package eth
 
 import (
+	"context"
 	"math/big"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -174,6 +176,7 @@ type StubClient struct {
 	Err                          error
 	TotalStake                   *big.Int
 	TranscoderPoolError          error
+	StubBackend                  Backend
 }
 
 type stubTranscoder struct {
@@ -182,18 +185,20 @@ type stubTranscoder struct {
 
 func (e *StubClient) Setup(password string, gasLimit uint64, gasPrice *big.Int) error { return nil }
 func (e *StubClient) Account() accounts.Account                                       { return accounts.Account{Address: e.TranscoderAddress} }
-func (e *StubClient) Backend() (Backend, error)                                       { return nil, ErrMissingBackend }
+func (e *StubClient) Backend() (Backend, error)                                       { return e.StubBackend, nil }
 
 // Rounds
 
-func (e *StubClient) InitializeRound() (*types.Transaction, error)       { return nil, nil }
-func (e *StubClient) CurrentRound() (*big.Int, error)                    { return big.NewInt(0), e.RoundsErr }
-func (e *StubClient) LastInitializedRound() (*big.Int, error)            { return big.NewInt(0), e.RoundsErr }
-func (e *StubClient) BlockHashForRound(round *big.Int) ([32]byte, error) { return [32]byte{}, nil }
-func (e *StubClient) CurrentRoundInitialized() (bool, error)             { return false, nil }
-func (e *StubClient) CurrentRoundLocked() (bool, error)                  { return false, nil }
-func (e *StubClient) CurrentRoundStartBlock() (*big.Int, error)          { return nil, nil }
-func (e *StubClient) Paused() (bool, error)                              { return false, nil }
+func (e *StubClient) InitializeRound() (*types.Transaction, error) { return nil, nil }
+func (e *StubClient) CurrentRound() (*big.Int, error)              { return big.NewInt(0), e.RoundsErr }
+func (e *StubClient) LastInitializedRound() (*big.Int, error)      { return e.BlockNum, e.RoundsErr }
+func (e *StubClient) BlockHashForRound(round *big.Int) ([32]byte, error) {
+	return e.BlockHashToReturn, nil
+}
+func (e *StubClient) CurrentRoundInitialized() (bool, error)    { return false, nil }
+func (e *StubClient) CurrentRoundLocked() (bool, error)         { return false, nil }
+func (e *StubClient) CurrentRoundStartBlock() (*big.Int, error) { return nil, nil }
+func (e *StubClient) Paused() (bool, error)                     { return false, nil }
 
 // Token
 
@@ -332,3 +337,81 @@ func (c *StubClient) SetGasInfo(uint64, *big.Int) error { return nil }
 
 // Faucet
 func (c *StubClient) NextValidRequest(common.Address) (*big.Int, error) { return nil, nil }
+
+type StubBackend struct {
+	LastSeenBlock *big.Int
+	Error         error
+}
+
+func (b *StubBackend) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	return nil, nil
+}
+func (b *StubBackend) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
+}
+func (b *StubBackend) CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
+}
+func (b *StubBackend) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
+	return 0, nil
+}
+func (b *StubBackend) TransactionByHash(ctx context.Context, txHash common.Hash) (tx *types.Transaction, isPending bool, err error) {
+	return nil, false, nil
+}
+func (b *StubBackend) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	return nil, nil
+}
+func (b *StubBackend) SendTransaction(ctx context.Context, tx *types.Transaction) error { return nil }
+func (b *StubBackend) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
+}
+func (b *StubBackend) PendingCallContract(ctx context.Context, call ethereum.CallMsg) ([]byte, error) {
+	return nil, nil
+}
+func (b *StubBackend) PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error) {
+	return nil, nil
+}
+func (b *StubBackend) PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error) {
+	return nil, nil
+}
+func (b *StubBackend) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
+	return nil, nil
+}
+func (b *StubBackend) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+	return 0, nil
+}
+func (b *StubBackend) PendingTransactionCount(ctx context.Context) (uint, error) { return 0, nil }
+func (b *StubBackend) EstimateGas(ctx context.Context, call ethereum.CallMsg) (uint64, error) {
+	return 0, nil
+}
+func (b *StubBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) { return nil, nil }
+func (b *StubBackend) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
+	return nil, nil
+}
+func (b *StubBackend) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
+	return nil, nil
+}
+func (b *StubBackend) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	return nil, nil
+}
+func (b *StubBackend) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+	return nil, nil
+}
+func (b *StubBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	return nil, nil
+}
+func (b *StubBackend) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	return &types.Header{
+		Number: b.LastSeenBlock,
+	}, b.Error
+}
+func (b *StubBackend) TransactionCount(ctx context.Context, blockHash common.Hash) (uint, error) {
+	return 0, nil
+}
+func (b *StubBackend) TransactionInBlock(ctx context.Context, blockHash common.Hash, index uint) (*types.Transaction, error) {
+	return nil, nil
+}
+func (b *StubBackend) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error) {
+	return nil, nil
+}
+func (b *StubBackend) ChainID(ctx context.Context) (*big.Int, error) { return nil, nil }

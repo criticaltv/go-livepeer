@@ -1,9 +1,11 @@
 package watchers
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -121,6 +123,19 @@ func (tw *TimeWatcher) Watch() error {
 	if err := tw.fetchAndSetTranscoderPoolSize(); err != nil {
 		return fmt.Errorf("error fetching initial transcoderPoolSize err=%v", err)
 	}
+
+	b, err := tw.lpEth.Backend()
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	lastSeenBlock, err := b.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("error fetching last seen block err=%v", err)
+	}
+	tw.setLastSeenBlock(lastSeenBlock.Number)
 
 	events := make(chan []*blockwatch.Event, 10)
 	sub := tw.watcher.Subscribe(events)

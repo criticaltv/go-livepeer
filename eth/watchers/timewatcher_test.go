@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/livepeer/go-livepeer/eth"
@@ -39,11 +40,19 @@ func TestSetAndGet_TranscoderPoolSize(t *testing.T) {
 	assert.Equal(size, tw.GetTranscoderPoolSize())
 }
 
-func TestRoundsWatcher_WatchAndStop(t *testing.T) {
+func TestTimeWatcher_WatchAndStop(t *testing.T) {
 	assert := assert.New(t)
 	size := big.NewInt(50)
+	block := big.NewInt(10)
+	round := big.NewInt(1)
+	hash := ethcommon.HexToHash("foo")
 	lpEth := &eth.StubClient{
-		PoolSize: size,
+		PoolSize:          size,
+		BlockNum:          round,
+		BlockHashToReturn: hash,
+		StubBackend: &eth.StubBackend{
+			LastSeenBlock: block,
+		},
 	}
 	watcher := &stubBlockWatcher{}
 	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, lpEth)
@@ -60,6 +69,12 @@ func TestRoundsWatcher_WatchAndStop(t *testing.T) {
 
 	go tw.Watch()
 	time.Sleep(2 * time.Millisecond)
+	bh := tw.LastInitializedBlockHash()
+	assert.Equal(hash, common.BytesToHash(bh[:]))
+	assert.Equal(round, tw.LastInitializedRound())
+	assert.Equal(size, tw.GetTranscoderPoolSize())
+	assert.Equal(block, tw.LastSeenBlock())
+	// Check state initialization
 
 	// New Round event
 	watcher.sink <- []*blockwatch.Event{blockEvent}
@@ -71,6 +86,7 @@ func TestRoundsWatcher_WatchAndStop(t *testing.T) {
 	copy(expectedHashForRound[:], newRoundEvent.Data[:])
 	assert.Equal(bhForRound, expectedHashForRound)
 	assert.Equal(size, tw.GetTranscoderPoolSize())
+	assert.Equal(header.Number, tw.LastSeenBlock())
 
 	// Test no NewRound events, values on rw remain the same
 	tw.setTranscoderPoolSize(big.NewInt(10))
@@ -83,6 +99,7 @@ func TestRoundsWatcher_WatchAndStop(t *testing.T) {
 	copy(expectedHashForRound[:], newRoundEvent.Data[:])
 	assert.Equal(bhForRound, expectedHashForRound)
 	assert.Equal(big.NewInt(10), tw.GetTranscoderPoolSize())
+	assert.Equal(header.Number, tw.LastSeenBlock())
 
 	// Test RPC paths (event removed)
 	blockEvent.BlockHeader.Logs = append(blockEvent.BlockHeader.Logs, newRoundEvent)
@@ -91,8 +108,8 @@ func TestRoundsWatcher_WatchAndStop(t *testing.T) {
 	time.Sleep(2 * time.Millisecond)
 	lastRound = tw.LastInitializedRound()
 	bhForRound = tw.LastInitializedBlockHash()
-	assert.Equal(lastRound.Int64(), int64(0))
-	assert.Equal(bhForRound, [32]byte{})
+	assert.Equal(hash, common.BytesToHash(bh[:]))
+	assert.Equal(round, tw.LastInitializedRound())
 	assert.Equal(size, tw.GetTranscoderPoolSize())
 
 	// Test Stop
@@ -103,15 +120,15 @@ func TestRoundsWatcher_WatchAndStop(t *testing.T) {
 	// Test watch error when RPC calls fail
 	tw = &TimeWatcher{
 		lpEth: &eth.StubClient{
-			RoundsErr: errors.New("roundswatcher error"),
+			RoundsErr: errors.New("timewatcher error"),
 		},
 	}
 	err = tw.Watch()
 	assert.NotNil(err)
-	assert.Contains(err.Error(), "roundswatcher error")
+	assert.Contains(err.Error(), "timewatcher error")
 }
 
-func TestRoundsWatcher_HandleLog(t *testing.T) {
+func TestTimeWatcher_HandleLog(t *testing.T) {
 	lpEth := &eth.StubClient{}
 	watcher := &stubBlockWatcher{}
 	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, lpEth)
@@ -143,7 +160,9 @@ func TestHandleBlockNum(t *testing.T) {
 	assert := assert.New(t)
 	watcher := &stubBlockWatcher{}
 
-	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, &eth.StubClient{})
+	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, &eth.StubClient{
+		StubBackend: &eth.StubBackend{},
+	})
 	assert.Nil(err)
 	header := defaultMiniHeader()
 	header.Number = big.NewInt(10)
@@ -164,7 +183,9 @@ func TestSubscribeBlocks(t *testing.T) {
 	assert := assert.New(t)
 	watcher := &stubBlockWatcher{}
 
-	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, &eth.StubClient{})
+	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, &eth.StubClient{
+		StubBackend: &eth.StubBackend{},
+	})
 	assert.Nil(err)
 	header := defaultMiniHeader()
 	header.Number = big.NewInt(10)
@@ -190,7 +211,9 @@ func TestSubscribeRounds(t *testing.T) {
 	assert := assert.New(t)
 	watcher := &stubBlockWatcher{}
 
-	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, &eth.StubClient{})
+	tw, err := NewTimeWatcher(stubRoundsManagerAddr, watcher, &eth.StubClient{
+		StubBackend: &eth.StubBackend{},
+	})
 	assert.Nil(err)
 	header := defaultMiniHeader()
 	newRoundEvent := newStubNewRoundLog()
