@@ -45,6 +45,8 @@ type TicketParams struct {
 	ExpirationBlock *big.Int
 
 	PricePerPixel *big.Rat
+
+	ExpectedExpirationParams *TicketExpirationParams
 }
 
 // WinProbRat returns the ticket WinProb as a percentage represented as a big.Rat
@@ -183,6 +185,13 @@ func (t *Ticket) AuxData() []byte {
 		ethcommon.LeftPadBytes(big.NewInt(t.CreationRound).Bytes(), uint256Size),
 		t.CreationRoundBlockHash.Bytes()...,
 	)
+}
+
+func (t *Ticket) ticketExpirationParams() *TicketExpirationParams {
+	return &TicketExpirationParams{
+		t.CreationRound,
+		t.CreationRoundBlockHash,
+	}
 }
 
 func (t *Ticket) flatten() []byte {

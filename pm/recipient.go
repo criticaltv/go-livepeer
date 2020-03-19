@@ -142,7 +142,7 @@ func (r *recipient) Stop() {
 
 // ReceiveTicket validates and processes a received ticket
 func (r *recipient) ReceiveTicket(ticket *Ticket, sig []byte, seed *big.Int) (string, bool, error) {
-	recipientRand := r.rand(seed, ticket.Sender, ticket.FaceValue, ticket.WinProb, ticket.ParamsExpirationBlock, ticket.PricePerPixel)
+	recipientRand := r.rand(seed, ticket.Sender, ticket.FaceValue, ticket.WinProb, ticket.ParamsExpirationBlock, ticket.PricePerPixel, ticket.ticketExpirationParams())
 
 	// If sender validation check fails, abort
 	if err := r.sm.ValidateSender(ticket.Sender); err != nil {
@@ -201,7 +201,7 @@ func (r *recipient) RedeemWinningTickets(sessionIDs []string) error {
 
 // RedeemWinningTicket redeems a single winning ticket
 func (r *recipient) RedeemWinningTicket(ticket *Ticket, sig []byte, seed *big.Int) error {
-	recipientRand := r.rand(seed, ticket.Sender, ticket.FaceValue, ticket.WinProb, ticket.ParamsExpirationBlock, ticket.PricePerPixel)
+	recipientRand := r.rand(seed, ticket.Sender, ticket.FaceValue, ticket.WinProb, ticket.ParamsExpirationBlock, ticket.PricePerPixel, ticket.ticketExpirationParams())
 	r.sm.QueueTicket(ticket.Sender, &SignedTicket{ticket, sig, recipientRand})
 	return nil
 }
@@ -222,17 +222,23 @@ func (r *recipient) TicketParams(sender ethcommon.Address, price *big.Rat) (*Tic
 
 	winProb := r.winProb(faceValue)
 
-	recipientRand := r.rand(seed, sender, faceValue, winProb, expirationBlock, price)
+	ticketExpirationparams := &TicketExpirationParams{
+		CreationRound:          r.tm.LastInitializedRound().Int64(),
+		CreationRoundBlockHash: r.tm.LastInitializedBlockHash(),
+	}
+
+	recipientRand := r.rand(seed, sender, faceValue, winProb, expirationBlock, price, ticketExpirationparams)
 	recipientRandHash := crypto.Keccak256Hash(ethcommon.LeftPadBytes(recipientRand.Bytes(), uint256Size))
 
 	return &TicketParams{
-		Recipient:         r.addr,
-		FaceValue:         faceValue,
-		WinProb:           winProb,
-		RecipientRandHash: recipientRandHash,
-		Seed:              seed,
-		ExpirationBlock:   expirationBlock,
-		PricePerPixel:     price,
+		Recipient:                r.addr,
+		FaceValue:                faceValue,
+		WinProb:                  winProb,
+		RecipientRandHash:        recipientRandHash,
+		Seed:                     seed,
+		ExpirationBlock:          expirationBlock,
+		PricePerPixel:            price,
+		ExpectedExpirationParams: ticketExpirationparams,
 	}, nil
 }
 
@@ -387,7 +393,7 @@ func (r *recipient) redeemWinningTicket(ticket *Ticket, sig []byte, recipientRan
 	return nil
 }
 
-func (r *recipient) rand(seed *big.Int, sender ethcommon.Address, faceValue *big.Int, winProb *big.Int, expirationBlock *big.Int, price *big.Rat) *big.Int {
+func (r *recipient) rand(seed *big.Int, sender ethcommon.Address, faceValue *big.Int, winProb *big.Int, expirationBlock *big.Int, price *big.Rat, ticketExpirationParams *TicketExpirationParams) *big.Int {
 	h := hmac.New(sha256.New, r.secret[:])
 	msg := append(seed.Bytes(), sender.Bytes()...)
 	msg = append(msg, faceValue.Bytes()...)
@@ -395,6 +401,14 @@ func (r *recipient) rand(seed *big.Int, sender ethcommon.Address, faceValue *big
 	msg = append(msg, expirationBlock.Bytes()...)
 	msg = append(msg, price.Num().Bytes()...)
 	msg = append(msg, price.Denom().Bytes()...)
+	msg = append(
+		msg,
+		append(
+			ethcommon.LeftPadBytes(big.NewInt(ticketExpirationParams.CreationRound).Bytes(), uint256Size),
+			ticketExpirationParams.CreationRoundBlockHash.Bytes()...,
+		)...,
+	)
+
 	h.Write(msg)
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
