@@ -133,13 +133,18 @@ func (h *lphttp) ServeSegment(w http.ResponseWriter, r *http.Request) {
 		Name:  uri,
 	}
 
-	res, err := orch.TranscodeSeg(segData, &hlsStream) // ANGIE - NEED TO CHANGE ALL JOBIDS IN TRANSCODING LOOP INTO STRINGS
+	res, err := orch.TranscodeSeg(segData, &hlsStream)
 
 	// Upload to OS and construct segment result set
 	var segments []*net.TranscodedSegmentData
 	var pixels int64
 	for i := 0; err == nil && i < len(res.TranscodeData.Segments); i++ {
-		name := fmt.Sprintf("%s/%d.ts", segData.Profiles[i].Name, segData.Seq) // ANGIE - NEED TO EDIT OUT JOB PROFILES
+		// TODO fix ts
+		ext := "ts"
+		if ffmpeg.MP4 == segData.Profiles[i].Format {
+			ext = "mp4"
+		}
+		name := fmt.Sprintf("%s/%d.%s", segData.Profiles[i].Name, segData.Seq, ext)
 		uri, err := res.OS.SaveData(name, res.TranscodeData.Segments[i].Data)
 		if err != nil {
 			glog.Error("Could not upload segment ", segData.Seq)
@@ -210,11 +215,20 @@ func makeFfmpegVideoProfiles(protoProfiles []*net.VideoProfile) []ffmpeg.VideoPr
 		if name == "" {
 			name = "net_" + common.DefaultProfileName(int(profile.Width), int(profile.Height), int(profile.Bitrate))
 		}
+		format := ffmpeg.MPEGTS
+		switch profile.Format {
+		case net.VideoProfile_MPEGTS:
+		case net.VideoProfile_MP4:
+			format = ffmpeg.MP4
+		default:
+			glog.Error("Unknown profile format ", profile.Format)
+		}
 		prof := ffmpeg.VideoProfile{
 			Name:       name,
 			Bitrate:    fmt.Sprint(profile.Bitrate),
 			Framerate:  uint(profile.Fps),
 			Resolution: fmt.Sprintf("%dx%d", profile.Width, profile.Height),
+			Format:     format,
 		}
 		profiles = append(profiles, prof)
 	}

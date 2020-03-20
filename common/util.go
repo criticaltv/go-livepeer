@@ -158,12 +158,22 @@ func FFmpegProfiletoNetProfile(ffmpegProfiles []ffmpeg.VideoProfile) ([]*net.Vid
 		if name == "" {
 			name = "ffmpeg_" + DefaultProfileName(width, height, bitrate)
 		}
+		format := net.VideoProfile_MPEGTS
+		switch profile.Format {
+		case ffmpeg.FormatNone:
+		case ffmpeg.MPEGTS:
+		case ffmpeg.MP4:
+			format = net.VideoProfile_MP4
+		default:
+			glog.Error("Unknown VideoProfile format ", profile.Format)
+		}
 		fullProfile := net.VideoProfile{
 			Name:    name,
 			Width:   int32(width),
 			Height:  int32(height),
 			Bitrate: int32(bitrate),
 			Fps:     uint32(profile.Framerate),
+			Format:  format,
 		}
 		profiles = append(profiles, &fullProfile)
 	}

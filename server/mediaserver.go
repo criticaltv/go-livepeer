@@ -68,6 +68,7 @@ type streamParameters struct {
 	rtmpKey    string
 	profiles   []ffmpeg.VideoProfile
 	resolution string
+	format     ffmpeg.Format
 }
 
 func (s *streamParameters) StreamID() string {
@@ -398,6 +399,7 @@ func (s *LivepeerServer) registerConnection(rtmpStrm stream.RTMPVideoStream) (*r
 		Name:       "source",
 		Resolution: params.resolution,
 		Bitrate:    "4000k", // Fix this
+		Format:     params.format,
 	}
 	hlsStrmID := core.MakeStreamID(mid, &vProfile)
 	s.connectionLock.RLock()
@@ -587,7 +589,17 @@ func (s *LivepeerServer) HandlePush(w http.ResponseWriter, r *http.Request) {
 	r.Body.Close()
 	r.URL = &url.URL{Scheme: "http", Host: r.Host, Path: r.URL.Path}
 
-	if ".ts" != path.Ext(r.URL.Path) {
+	// Determine the input format the request is claiming to have
+	format := ffmpeg.FormatNone
+	switch ext := path.Ext(r.URL.Path); ext {
+	case ".ts":
+		format = ffmpeg.MPEGTS
+	case ".mp4":
+		format = ffmpeg.MP4
+	default:
+		glog.Error("Unknown file extension ", ext)
+	}
+	if ffmpeg.FormatNone == format {
 		// ffmpeg sends us a m3u8 as well, so ignore
 		// Alternatively, reject m3u8s explicitly and take any other type
 		// TODO also look at use content-type
@@ -619,6 +631,13 @@ func (s *LivepeerServer) HandlePush(w http.ResponseWriter, r *http.Request) {
 		st := stream.NewBasicRTMPVideoStream(appData)
 		params := streamParams(st)
 		params.resolution = r.Header.Get("Content-Resolution")
+		params.format = format
+		// Set output formats if not explicitly specified
+		for i, v := range params.profiles {
+			if ffmpeg.FormatNone == v.Format {
+				params.profiles[i].Format = format
+			}
+		}
 
 		cxn, err = s.registerConnection(st)
 		if err != nil {
@@ -701,6 +720,9 @@ func (s *LivepeerServer) HandlePush(w http.ResponseWriter, r *http.Request) {
 	for i, url := range urls {
 		mw.SetBoundary(boundary)
 		typ, ext, length := "video/MP2T", "ts", len(renditionData[i])
+		if ffmpeg.MP4 == cxn.params.profiles[i].Format {
+			typ, ext = "video/mp4", "mp4"
+		}
 		if length == 0 {
 			typ, ext, length = "application/vnd+livepeer.uri", "txt", len(url)
 		}

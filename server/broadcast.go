@@ -21,6 +21,7 @@ import (
 	"github.com/livepeer/go-livepeer/pm"
 	"github.com/livepeer/go-livepeer/verification"
 
+	"github.com/livepeer/lpms/ffmpeg"
 	"github.com/livepeer/lpms/stream"
 )
 
@@ -272,7 +273,11 @@ func processSegment(cxn *rtmpConnection, seg *stream.HLSSegment) ([]string, erro
 	}
 
 	seg.Name = "" // hijack seg.Name to convey the uploaded URI
-	name := fmt.Sprintf("%s/%d.ts", vProfile.Name, seg.SeqNo)
+	ext := "ts"
+	if ffmpeg.MP4 == vProfile.Format {
+		ext = "mp4"
+	}
+	name := fmt.Sprintf("%s/%d.%s", vProfile.Name, seg.SeqNo, ext)
 	uri, err := cpl.GetOSSession().SaveData(name, seg.Data)
 	if err != nil {
 		glog.Errorf("Error saving segment nonce=%d seqNo=%d: %v", nonce, seg.SeqNo, err)
@@ -435,7 +440,11 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 		}
 
 		if bos != nil && !drivers.IsOwnExternal(url) {
-			name := fmt.Sprintf("%s/%d.ts", sess.Profiles[i].Name, seg.SeqNo)
+			ext := "ts"
+			if ffmpeg.MP4 == sess.Profiles[i].Format {
+				ext = "mp4"
+			}
+			name := fmt.Sprintf("%s/%d.%s", sess.Profiles[i].Name, seg.SeqNo, ext)
 			newURL, err := bos.SaveData(name, data)
 			if err != nil {
 				switch err.Error() {
