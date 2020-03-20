@@ -69,4 +69,6 @@ require (
 	gopkg.in/urfave/cli.v1 v1.0.0-00010101000000-000000000000 // indirect
 )
 
+replace github.com/livepeer/lpms => /Users/josh/livepeer/code/lpms
+
 replace gopkg.in/urfave/cli.v1 => github.com/urfave/cli v1.22.2-0.20191002033821-63cd2e3d6bb5
