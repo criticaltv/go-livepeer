@@ -361,6 +361,7 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 	if sess.Sender != nil {
 		if err := sess.Sender.ValidateTicketParams(pmTicketParams(sess.OrchestratorInfo.TicketParams)); err != nil {
 			if err != pm.ErrTicketParamsExpired {
+				glog.Error("unable to submit segment err=", err)
 				cxn.sessManager.removeSession(sess)
 				return nil, err
 			}
@@ -376,10 +377,12 @@ func transcodeSegment(cxn *rtmpConnection, seg *stream.HLSSegment, name string,
 	}
 	res, err := SubmitSegment(sess, seg, nonce)
 	if err != nil || res == nil {
+		glog.Error("unable to submit segment err=", err)
 		cxn.sessManager.removeSession(sess)
 		if res == nil && err == nil {
-			return nil, err
+			err = errors.New("empty response")
 		}
+		glog.Error("unable to submit segment err=", err)
 		return nil, err
 	}
 
